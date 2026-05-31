@@ -1,0 +1,2 @@
+[console_scripts]
+evan = cli.main:cli

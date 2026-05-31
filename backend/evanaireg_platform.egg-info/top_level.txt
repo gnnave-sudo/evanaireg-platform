@@ -1,0 +1,6 @@
+agents
+api
+cli
+core
+evan_aireg_platform
+ingestion

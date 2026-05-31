@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --obsidian: #0A0A0F;
+    --near-black: #0F0F14;
+    --warm-amber: #E8A838;
+    --pale-gold: #F5E6C8;
+    --soft-cream: #F0EDE6;
+    --muted-sand: #9B968B;
+    --surface-dark: #15151C;
+    --surface-mid: #1C1C26;
+    --amber-glow: rgba(232, 168, 56, 0.15);
+    --amber-core: rgba(232, 168, 56, 0.08);
+    --subtle-line: rgba(240, 237, 230, 0.06);
+    --muted-sand-50: rgba(155, 150, 139, 0.5);
+
+    --background: 240 14% 4%;
+    --foreground: 40 20% 93%;
+    --card: 240 14% 6%;
+    --card-foreground: 40 20% 93%;
+    --popover: 240 14% 6%;
+    --popover-foreground: 40 20% 93%;
+    --primary: 37 78% 56%;
+    --primary-foreground: 240 14% 4%;
+    --secondary: 240 10% 10%;
+    --secondary-foreground: 40 20% 93%;
+    --muted: 240 10% 10%;
+    --muted-foreground: 37 8% 58%;
+    --accent: 240 10% 10%;
+    --accent-foreground: 40 20% 93%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 40 20% 93% / 0.06;
+    --input: 40 20% 93% / 0.06;
+    --ring: 37 78% 56%;
+    --radius: 0.625rem;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-obsidian text-soft-cream;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  * {
+    @apply border-subtle-line;
+  }
+
+  ::selection {
+    background: rgba(232, 168, 56, 0.3);
+    color: #F0EDE6;
+  }
+}
+
+/* ===== Custom Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0A0A0F;
+}
+::-webkit-scrollbar-thumb {
+  background: #1C1C26;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a2a38;
+}
+
+/* ===== Focus Visible ===== */
+:focus-visible {
+  outline: 2px solid rgba(232, 168, 56, 0.6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ===== Page Transition ===== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* ===== Mobile Menu Animations ===== */
+@keyframes menuEnter {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes menuItemEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-menu-enter {
+  animation: menuEnter 0.25s ease-out forwards;
+}
+.animate-menu-item {
+  opacity: 0;
+  animation: menuItemEnter 0.35s ease-out forwards;
+}
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}

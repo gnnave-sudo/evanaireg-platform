@@ -1,0 +1,738 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Evan Copilot Framework",
+    "description": "Generic multi-entity, multi-jurisdiction compliance copilot API. Proprietary. Copyright (c) 2026 Evan. All rights reserved.",
+    "version": "3.0.0",
+    "contact": { "name": "Evan", "url": "https://tinyhumans.ai" }
+  },
+  "servers": [
+    { "url": "http://localhost:8100", "description": "Local development" },
+    { "url": "https://api.evan-copilot.ai", "description": "Production" }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "API Info",
+        "description": "Returns API metadata, version, available endpoints, and agent list.",
+        "responses": {
+          "200": {
+            "description": "API information",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiInfo" },
+                "example": {
+                  "name": "Evan Copilot Framework",
+                  "version": "3.0.0-generic",
+                  "owner": "Evan (Proprietary)",
+                  "mode": "multi-entity, multi-jurisdiction",
+                  "agents": ["RIE", "TMA", "RE", "ICCA"],
+                  "endpoints": { "procedures": "/v1/vos/* (7)", "nl": "/v1/nl/query", "entities": "/v1/entities" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Public health endpoint. No authentication required.",
+        "responses": {
+          "200": {
+            "description": "System health status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" },
+                "example": {
+                  "status": "healthy",
+                  "version": "3.0.0-generic",
+                  "uptime_seconds": 3600.5,
+                  "agents_ready": true,
+                  "chroma_connected": true,
+                  "db_connected": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agents/status": {
+      "get": {
+        "summary": "Agent Status",
+        "description": "Returns health status for all 4 compliance agents.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Agent status list",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AgentStatusResponse" },
+                "example": {
+                  "agents": [
+                    { "id": "RIE", "name": "Regulatory Intelligence Engine", "status": "active", "chromadb_connected": true, "db_connected": true },
+                    { "id": "TMA", "name": "Transaction Monitoring Agent", "status": "active", "chromadb_connected": true, "db_connected": true },
+                    { "id": "RE", "name": "Reporting Engine", "status": "active", "chromadb_connected": true, "db_connected": true },
+                    { "id": "ICCA", "name": "Contract & Compliance Agent", "status": "active", "chromadb_connected": true, "db_connected": true }
+                  ],
+                  "system_health": "healthy"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/entities": {
+      "get": {
+        "summary": "List Entities",
+        "description": "List all configured client entities.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Entity list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entities": { "type": "array", "items": { "$ref": "#/components/schemas/Entity" } }
+                  }
+                },
+                "example": {
+                  "entities": [
+                    { "id": 1, "slug": "vortex-pay", "name": "Vortex Pay", "legal_name": "Vortex Pay S. de R.L. de C.V.", "industry": "crypto-adjacent-dnfbp", "active": 1 },
+                    { "id": 2, "slug": "singapore-fintech", "name": "Singapore FinTech Ltd", "legal_name": "Singapore FinTech Pte. Ltd.", "industry": "fintech-vasp", "active": 1 }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Entity",
+        "description": "Create a new client entity. This is the first step to onboard a new client.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EntityCreateRequest" },
+              "example": { "slug": "acme-corp", "name": "Acme Corp", "legal_name": "Acme Corporation Inc.", "industry": "fintech" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Entity created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Entity" } } } }
+        }
+      }
+    },
+    "/v1/entities/{slug}": {
+      "get": {
+        "summary": "Get Entity",
+        "description": "Get details for a specific entity by slug.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "slug", "in": "path", "required": true, "schema": { "type": "string" }, "example": "vortex-pay" }
+        ],
+        "responses": {
+          "200": { "description": "Entity details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Entity" } } } },
+          "404": { "description": "Entity not found" }
+        }
+      }
+    },
+    "/v1/vos/deadlines": {
+      "post": {
+        "summary": "PROC-001: Deadline Scan",
+        "description": "Scan compliance obligations due within N days for an entity. Returns prioritized list with risk assessment.",
+        "tags": ["Vos Procedures"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DeadlineRequest" },
+              "example": { "entity_slug": "vortex-pay", "jurisdiction_code": "MEX", "days_ahead": 60 }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Obligations list",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DeadlineResponse" },
+                "example": {
+                  "entity_slug": "vortex-pay",
+                  "items": [
+                    { "obligation": "POA / e-firma renewal", "domain": "CORP", "due_date": "Rolling", "owner": "Legal Rep", "status": "critical", "priority": "P0", "risk": "CRITICAL" },
+                    { "obligation": "PLD Portal - threshold aviso", "domain": "PLD", "due_date": "Rolling", "owner": "Compliance Officer", "status": "open", "priority": "P1", "risk": "HIGH" }
+                  ],
+                  "critical_count": 1,
+                  "generated_at": "2026-05-21T10:00:00"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vos/aviso/draft": {
+      "post": {
+        "summary": "PROC-002: Aviso Draft",
+        "description": "Draft a PLD threshold aviso. Reads the applicable threshold from the entity's configuration. Returns XML draft if reportable.",
+        "tags": ["Vos Procedures"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AvisoRequest" },
+              "example": { "entity_slug": "vortex-pay", "fee_type": "FX Fee", "amount": 50000, "currency": "MXN" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aviso draft result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AvisoResponse" },
+                "example": {
+                  "entity_slug": "vortex-pay",
+                  "reportable": true,
+                  "threshold_value": 21890.4,
+                  "threshold_unit": "MXN",
+                  "draft_xml": "<aviso>...XML draft...</aviso>",
+                  "warning": null,
+                  "generated_at": "2026-05-21T10:00:00"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vos/revenue/summary": {
+      "post": {
+        "summary": "PROC-003: Revenue Summary",
+        "description": "Pre-fill ISR tax return revenue lines. Returns categorized revenue with entity/partner splits and exclusion reasons.",
+        "tags": ["Vos Procedures"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RevenueRequest" },
+              "example": { "entity_slug": "vortex-pay", "year": 2025 }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Revenue summary",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RevenueResponse" },
+                "example": {
+                  "entity_slug": "vortex-pay",
+                  "year": 2025,
+                  "lines": [
+                    { "fee_type": "FX Fees", "entity_pct": 100, "included": true },
+                    { "fee_type": "Crypto Revenue", "entity_pct": 0, "included": false, "reason_excluded": "Crypto revenue may NOT be recorded as entity revenue" }
+                  ],
+                  "total_entity_revenue": 0,
+                  "filing_deadline": "2026-03-31",
+                  "urgency": "due_soon"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vos/compliance/check": {
+      "post": {
+        "summary": "PROC-004: Compliance Check",
+        "description": "Run all configured compliance rules for an entity. Returns per-rule status with severity and detail.",
+        "tags": ["Vos Procedures"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ComplianceCheckRequest" },
+              "example": { "entity_slug": "vortex-pay", "jurisdiction_code": "MEX" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Compliance check results",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ComplianceCheckResponse" },
+                "example": {
+                  "entity_slug": "vortex-pay",
+                  "overall_status": "FLAGGED",
+                  "rules_total": 6,
+                  "compliant": 4,
+                  "flagged": 2,
+                  "rules": [
+                    { "rule_id": "RULE-001", "name": "No Crypto Revenue", "status": "COMPLIANT", "severity": "CRITICAL", "detail": "FX revenue processed through BTL" },
+                    { "rule_id": "RULE-003", "name": "Settlement Channel Active", "status": "FLAGGED", "severity": "HIGH", "detail": "BBVA deactivated" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vos/poa/status": {
+      "post": {
+        "summary": "PROC-005: POA / e-firma Status",
+        "description": "Check Power of Attorney and electronic signature transfer status. Returns step-by-step progress.",
+        "tags": ["Vos Procedures"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "entity_slug", "in": "query", "required": true, "schema": { "type": "string" }, "example": "vortex-pay" }
+        ],
+        "responses": {
+          "200": {
+            "description": "POA status",
+            "content": {
+              "application/json": {
+                "example": {
+                  "entity_slug": "vortex-pay",
+                  "overall_status": "IN_PROGRESS",
+                  "steps": [
+                    { "step": 1, "name": "POA document drafted", "status": "COMPLETE" },
+                    { "step": 5, "name": "Registry filing", "status": "IN_PROGRESS" },
+                    { "step": 6, "name": "e-firma transfer", "status": "PENDING" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vos/cnbv/status": {
+      "post": {
+        "summary": "PROC-006: Regulatory Status",
+        "description": "Check regulatory body registration status (CNBV, MAS, FCA, etc. — jurisdiction-agnostic).",
+        "tags": ["Vos Procedures"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "entity_slug", "in": "query", "required": true, "schema": { "type": "string" }, "example": "vortex-pay" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Regulatory status",
+            "content": {
+              "application/json": {
+                "example": {
+                  "entity_slug": "vortex-pay",
+                  "registration_status": "IN_PROGRESS",
+                  "estimated_months": 10,
+                  "obligations": [
+                    { "name": "AML Policy", "status": "SUBMITTED", "due": "2026-03-31" },
+                    { "name": "Annex 4/5", "status": "IN_PREPARATION", "due": "2026-06-30" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vos/settlement/status": {
+      "post": {
+        "summary": "PROC-007: Settlement Status",
+        "description": "Check settlement channel status and alternatives. Returns banking channel health.",
+        "tags": ["Vos Procedures"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "entity_slug", "in": "query", "required": true, "schema": { "type": "string" }, "example": "vortex-pay" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settlement status",
+            "content": {
+              "application/json": {
+                "example": {
+                  "entity_slug": "vortex-pay",
+                  "primary_bank_status": "DEACTIVATED",
+                  "alternative_channels": ["Clabe Receivables", "Partner Settlement"],
+                  "risk_level": "HIGH"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tx/ingest": {
+      "post": {
+        "summary": "Ingest Transaction",
+        "description": "Ingest a transaction from Pomelo or any payment provider. Auto-evaluates thresholds.",
+        "tags": ["Transaction Monitoring"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "entity_slug", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TransactionIngest" },
+              "example": { "tx_id": "TX-20260521-001", "amount": 50000, "currency": "MXN", "fee_type": "FX Fee", "counterparty": "Merchant ABC" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction processed",
+            "content": {
+              "application/json": {
+                "example": {
+                  "tx_id": "TX-20260521-001",
+                  "amount": 50000,
+                  "threshold_flag": true,
+                  "threshold_reason": "FX fee 50000.00 MXN exceeds PLD Single Transaction (21890.40)",
+                  "status": "flagged"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tx/recent": {
+      "get": {
+        "summary": "Get Recent Transactions",
+        "description": "Get recent transactions for an entity.",
+        "tags": ["Transaction Monitoring"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "entity_slug", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } }
+        ],
+        "responses": {
+          "200": { "description": "Transaction list" }
+        }
+      }
+    },
+    "/v1/nl/query": {
+      "post": {
+        "summary": "Natural Language Query",
+        "description": "Query the compliance copilot in natural language. Automatically maps to the appropriate Vos procedure.",
+        "tags": ["Natural Language"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NLQueryRequest" },
+              "example": { "query": "What AML filings are due in 30 days?", "entity_slug": "vortex-pay", "jurisdiction_code": "MEX" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "NL response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NLQueryResponse" },
+                "example": {
+                  "query": "What AML filings are due in 30 days?",
+                  "procedure_triggered": "PROC-001",
+                  "response": "Found 2 critical obligations in the next 30 days. Total due: 5.",
+                  "sources": ["compliance_calendar"],
+                  "confidence": 0.92,
+                  "entity_slug": "vortex-pay",
+                  "generated_at": "2026-05-21T10:00:00"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ingest/text": {
+      "post": {
+        "summary": "Ingest Text Document",
+        "description": "Ingest raw text into ChromaDB for semantic RAG search.",
+        "tags": ["Ingestion"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/IngestRequest" },
+              "example": { "entity_slug": "vortex-pay", "jurisdiction_code": "MEX", "title": "LFPIORPI Article 17", "text": "Article 17. Obligated subjects must report..." }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ingestion result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IngestResponse" },
+                "example": { "doc_id": "vortex-pay_MEX_20260521", "title": "LFPIORPI Article 17", "chunks_stored": 12, "total_chars": 15420 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ingest/status/{entity_slug}": {
+      "get": {
+        "summary": "Ingestion Status",
+        "description": "Check how many regulation chunks are stored for an entity.",
+        "tags": ["Ingestion"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "entity_slug", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Ingestion status" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiInfo": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "string" },
+          "owner": { "type": "string" },
+          "mode": { "type": "string" },
+          "endpoints": { "type": "object" },
+          "agents": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["healthy", "degraded"] },
+          "version": { "type": "string" },
+          "uptime_seconds": { "type": "number" },
+          "agents_ready": { "type": "boolean" },
+          "chroma_connected": { "type": "boolean" },
+          "db_connected": { "type": "boolean" }
+        }
+      },
+      "AgentStatusResponse": {
+        "type": "object",
+        "properties": {
+          "agents": { "type": "array", "items": { "type": "object" } },
+          "system_health": { "type": "string" }
+        }
+      },
+      "Entity": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "slug": { "type": "string" },
+          "name": { "type": "string" },
+          "legal_name": { "type": "string" },
+          "industry": { "type": "string" },
+          "active": { "type": "integer" },
+          "metadata": { "type": "object" }
+        }
+      },
+      "EntityCreateRequest": {
+        "type": "object",
+        "required": ["slug", "name"],
+        "properties": {
+          "slug": { "type": "string", "description": "URL-safe unique identifier" },
+          "name": { "type": "string" },
+          "legal_name": { "type": "string" },
+          "industry": { "type": "string" },
+          "metadata": { "type": "object" }
+        }
+      },
+      "DeadlineRequest": {
+        "type": "object",
+        "required": ["entity_slug"],
+        "properties": {
+          "entity_slug": { "type": "string" },
+          "jurisdiction_code": { "type": "string" },
+          "days_ahead": { "type": "integer", "minimum": 1, "maximum": 365, "default": 60 }
+        }
+      },
+      "DeadlineItem": {
+        "type": "object",
+        "properties": {
+          "obligation": { "type": "string" },
+          "domain": { "type": "string" },
+          "due_date": { "type": "string" },
+          "owner": { "type": "string" },
+          "status": { "type": "string" },
+          "priority": { "type": "string", "enum": ["P0", "P1", "P2"] },
+          "risk": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] }
+        }
+      },
+      "DeadlineResponse": {
+        "type": "object",
+        "properties": {
+          "entity_slug": { "type": "string" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/DeadlineItem" } },
+          "critical_count": { "type": "integer" },
+          "generated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AvisoRequest": {
+        "type": "object",
+        "required": ["entity_slug", "fee_type", "amount"],
+        "properties": {
+          "entity_slug": { "type": "string" },
+          "fee_type": { "type": "string" },
+          "amount": { "type": "number" },
+          "currency": { "type": "string", "default": "MXN" },
+          "counterparty": { "type": "string" },
+          "activity_type": { "type": "string" }
+        }
+      },
+      "AvisoResponse": {
+        "type": "object",
+        "properties": {
+          "entity_slug": { "type": "string" },
+          "reportable": { "type": "boolean" },
+          "threshold_value": { "type": "number" },
+          "threshold_unit": { "type": "string" },
+          "draft_xml": { "type": "string" },
+          "warning": { "type": ["string", "null"] },
+          "generated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "RevenueRequest": {
+        "type": "object",
+        "required": ["entity_slug"],
+        "properties": {
+          "entity_slug": { "type": "string" },
+          "year": { "type": "integer" }
+        }
+      },
+      "RevenueResponse": {
+        "type": "object",
+        "properties": {
+          "entity_slug": { "type": "string" },
+          "year": { "type": "integer" },
+          "lines": { "type": "array", "items": { "type": "object" } },
+          "total_entity_revenue": { "type": "number" },
+          "filing_deadline": { "type": "string" },
+          "urgency": { "type": "string" },
+          "generated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ComplianceCheckRequest": {
+        "type": "object",
+        "required": ["entity_slug"],
+        "properties": {
+          "entity_slug": { "type": "string" },
+          "jurisdiction_code": { "type": "string" }
+        }
+      },
+      "ComplianceRuleResult": {
+        "type": "object",
+        "properties": {
+          "rule_id": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "status": { "type": "string" },
+          "severity": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+          "detail": { "type": "string" }
+        }
+      },
+      "ComplianceCheckResponse": {
+        "type": "object",
+        "properties": {
+          "entity_slug": { "type": "string" },
+          "overall_status": { "type": "string" },
+          "rules_total": { "type": "integer" },
+          "compliant": { "type": "integer" },
+          "flagged": { "type": "integer" },
+          "rules": { "type": "array", "items": { "$ref": "#/components/schemas/ComplianceRuleResult" } },
+          "generated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "NLQueryRequest": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "entity_slug": { "type": "string" },
+          "jurisdiction_code": { "type": "string" }
+        }
+      },
+      "NLQueryResponse": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "procedure_triggered": { "type": ["string", "null"] },
+          "response": { "type": "string" },
+          "sources": { "type": "array", "items": { "type": "string" } },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "entity_slug": { "type": "string" },
+          "generated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "TransactionIngest": {
+        "type": "object",
+        "required": ["tx_id", "amount", "fee_type"],
+        "properties": {
+          "tx_id": { "type": "string" },
+          "amount": { "type": "number" },
+          "currency": { "type": "string", "default": "MXN" },
+          "fee_type": { "type": "string" },
+          "counterparty": { "type": "string" },
+          "status": { "type": "string" }
+        }
+      },
+      "IngestRequest": {
+        "type": "object",
+        "required": ["entity_slug", "jurisdiction_code", "title", "text"],
+        "properties": {
+          "entity_slug": { "type": "string" },
+          "jurisdiction_code": { "type": "string" },
+          "title": { "type": "string" },
+          "text": { "type": "string" },
+          "doc_id": { "type": "string" },
+          "source_url": { "type": "string" }
+        }
+      },
+      "IngestResponse": {
+        "type": "object",
+        "properties": {
+          "doc_id": { "type": "string" },
+          "title": { "type": "string" },
+          "entity_slug": { "type": "string" },
+          "jurisdiction_code": { "type": "string" },
+          "chunks_stored": { "type": "integer" },
+          "total_chars": { "type": "integer" }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key passed as Bearer token. Dev mode accepts any key."
+      }
+    }
+  },
+  "tags": [
+    { "name": "Vos Procedures", "description": "Core compliance procedures (PROC-001 through PROC-007)" },
+    { "name": "Natural Language", "description": "NL interface for conversational compliance queries" },
+    { "name": "Transaction Monitoring", "description": "Real-time transaction ingestion and threshold monitoring" },
+    { "name": "Ingestion", "description": "Document ingestion pipeline for regulation RAG" }
+  ]
+}

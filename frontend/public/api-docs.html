@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evan Copilot API — Shape Explorer</title>
+<style>
+:root {
+  --obsidian: #0A0A0F;
+  --near-black: #0F0F14;
+  --surface: #15151C;
+  --surface-mid: #1C1C26;
+  --amber: #E8A838;
+  --amber-glow: rgba(232,168,56,0.15);
+  --cream: #F0EDE6;
+  --sand: #9B968B;
+  --green: #34d399;
+  --red: #f87171;
+  --blue: #38bdf8;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
+  background: var(--obsidian);
+  color: var(--cream);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+header {
+  border-bottom: 1px solid rgba(240,237,230,0.06);
+  padding-bottom: 24px;
+  margin-bottom: 32px;
+}
+h1 { font-family: 'Space Grotesk', sans-serif; font-size: 28px; color: var(--amber); letter-spacing: -0.5px; }
+.subtitle { color: var(--sand); font-size: 13px; margin-top: 4px; }
+.badge {
+  display: inline-block; padding: 2px 10px; border-radius: 12px;
+  font-size: 11px; margin-right: 8px; margin-top: 8px;
+}
+.badge-amber { background: var(--amber-glow); color: var(--amber); border: 1px solid rgba(232,168,56,0.2); }
+.badge-green { background: rgba(52,211,153,0.1); color: var(--green); border: 1px solid rgba(52,211,153,0.2); }
+.badge-red { background: rgba(248,113,113,0.1); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
+
+h2 { font-family: 'Space Grotesk', sans-serif; font-size: 18px; color: var(--amber); margin: 32px 0 16px; padding-bottom: 8px; border-bottom: 1px solid rgba(240,237,230,0.06); }
+h3 { font-size: 14px; color: var(--cream); margin: 20px 0 8px; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0; }
+.stat-card { background: var(--surface); border: 1px solid rgba(240,237,230,0.06); border-radius: 8px; padding: 16px; }
+.stat-value { font-size: 24px; font-weight: 600; color: var(--amber); }
+.stat-label { font-size: 11px; color: var(--sand); text-transform: uppercase; letter-spacing: 1px; }
+
+.endpoint { background: var(--surface); border: 1px solid rgba(240,237,230,0.06); border-radius: 8px; margin: 8px 0; overflow: hidden; }
+.endpoint-header { display: flex; align-items: center; padding: 12px 16px; cursor: pointer; gap: 12px; }
+.endpoint-header:hover { background: var(--surface-mid); }
+.method { font-weight: 600; font-size: 11px; padding: 2px 8px; border-radius: 4px; min-width: 52px; text-align: center; }
+.method-get { background: rgba(52,211,153,0.15); color: var(--green); }
+.method-post { background: rgba(232,168,56,0.15); color: var(--amber); }
+.path { font-family: monospace; color: var(--cream); font-size: 12px; }
+.description { color: var(--sand); font-size: 11px; margin-left: auto; }
+.endpoint-body { display: none; padding: 16px; border-top: 1px solid rgba(240,237,230,0.06); background: var(--near-black); }
+.endpoint-body.active { display: block; }
+.endpoint-body pre { background: var(--obsidian); border: 1px solid rgba(240,237,230,0.06); border-radius: 6px; padding: 12px; overflow-x: auto; color: var(--sand); font-size: 11px; }
+.endpoint-body code { color: var(--amber); }
+.tag { font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
+.tag-vos { background: rgba(232,168,56,0.1); color: var(--amber); }
+.tag-nl { background: rgba(56,189,248,0.1); color: var(--blue); }
+.tag-tx { background: rgba(52,211,153,0.1); color: var(--green); }
+.tag-ingest { background: rgba(168,162,158,0.1); color: var(--sand); }
+.tag-meta { background: rgba(240,237,230,0.05); color: var(--sand); }
+
+.flow-box { background: var(--surface); border-left: 3px solid var(--amber); padding: 16px 20px; margin: 12px 0; border-radius: 0 8px 8px 0; }
+.flow-box pre { background: var(--obsidian); border: 1px solid rgba(240,237,230,0.06); border-radius: 6px; padding: 12px; overflow-x: auto; font-size: 11px; color: var(--sand); }
+.arrow { color: var(--amber); font-size: 16px; margin: 4px 0; }
+
+.schema-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 11px; }
+.schema-table th { text-align: left; padding: 8px 12px; background: var(--surface-mid); color: var(--amber); font-weight: 500; border-bottom: 1px solid rgba(240,237,230,0.06); }
+.schema-table td { padding: 6px 12px; border-bottom: 1px solid rgba(240,237,230,0.04); color: var(--sand); }
+.schema-table td:first-child { color: var(--cream); font-weight: 500; }
+
+.footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(240,237,230,0.06); color: var(--sand); font-size: 11px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Evan Copilot Framework</h1>
+  <div class="subtitle">API Shape Explorer v3.0.0-generic | 18 Endpoints | 24 Schemas | 4 Agents | 7 Procedures</div>
+  <div>
+    <span class="badge badge-amber">Multi-Entity</span>
+    <span class="badge badge-amber">Multi-Jurisdiction</span>
+    <span class="badge badge-green">Bearer Auth</span>
+    <span class="badge badge-red">Proprietary</span>
+  </div>
+</header>
+
+<div class="stats-grid">
+  <div class="stat-card"><div class="stat-value">18</div><div class="stat-label">Endpoints</div></div>
+  <div class="stat-card"><div class="stat-value">24</div><div class="stat-label">Schemas</div></div>
+  <div class="stat-card"><div class="stat-value">4</div><div class="stat-label">Agents</div></div>
+  <div class="stat-card"><div class="stat-value">7</div><div class="stat-label">Procedures</div></div>
+  <div class="stat-card"><div class="stat-value">5</div><div class="stat-label">Tag Groups</div></div>
+</div>
+
+<h2>Endpoint Map</h2>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-get">GET</span>
+    <span class="path">/</span>
+    <span class="description">API metadata, version, available endpoints</span>
+    <span class="tag tag-meta">meta</span>
+  </div>
+  <div class="endpoint-body">
+    <pre>{
+  "name": "Evan Copilot Framework",
+  "version": "3.0.0-generic",
+  "agents": ["RIE", "TMA", "RE", "ICCA"],
+  "endpoints": { "procedures": "/v1/vos/*", "nl": "/v1/nl/query" }
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-get">GET</span>
+    <span class="path">/health</span>
+    <span class="description">Public health check — no auth required</span>
+    <span class="tag tag-meta">meta</span>
+  </div>
+  <div class="endpoint-body">
+    <pre>{
+  "status": "healthy",
+  "version": "3.0.0-generic",
+  "uptime_seconds": 3600.5,
+  "agents_ready": true,
+  "chroma_connected": true,
+  "db_connected": true
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-get">GET</span>
+    <span class="path">/v1/agents/status</span>
+    <span class="description">Health status for all 4 compliance agents</span>
+    <span class="tag tag-meta">agents</span>
+  </div>
+  <div class="endpoint-body">
+    <pre>{
+  "agents": [
+    { "id": "RIE", "name": "Regulatory Intelligence Engine", "status": "active" },
+    { "id": "TMA", "name": "Transaction Monitoring Agent", "status": "active" },
+    { "id": "RE", "name": "Reporting Engine", "status": "active" },
+    { "id": "ICCA", "name": "Contract & Compliance Agent", "status": "active" }
+  ],
+  "system_health": "healthy"
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-get">GET</span>
+    <span class="path">/v1/entities</span>
+    <span class="description">List all configured client entities</span>
+    <span class="tag tag-meta">entities</span>
+  </div>
+  <div class="endpoint-body">
+    <pre>{
+  "entities": [
+    { "slug": "vortex-pay", "name": "Vortex Pay", "industry": "crypto-adjacent-dnfbp" },
+    { "slug": "singapore-fintech", "name": "Singapore FinTech Ltd", "industry": "fintech-vasp" }
+  ]
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-post">POST</span>
+    <span class="path">/v1/entities</span>
+    <span class="description">Create a new client entity</span>
+    <span class="tag tag-meta">entities</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>Request:</strong>
+    <pre>{ "slug": "acme-corp", "name": "Acme Corp", "legal_name": "Acme Inc.", "industry": "fintech" }</pre>
+    <strong>Response:</strong>
+    <pre>{ "id": 3, "slug": "acme-corp", "name": "Acme Corp", "active": true }</pre>
+  </div>
+</div>
+
+<h2>7 Vos Procedures</h2>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-post">POST</span>
+    <span class="path">/v1/vos/deadlines</span>
+    <span class="description">PROC-001: Scan compliance obligations due in N days</span>
+    <span class="tag tag-vos">vos</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>Request:</strong> <code>{"entity_slug": "vortex-pay", "days_ahead": 60}</code>
+    <strong>Response:</strong>
+    <pre>{
+  "entity_slug": "vortex-pay",
+  "items": [
+    { "obligation": "POA / e-firma renewal", "due_date": "Rolling", "owner": "Legal Rep", "priority": "P0", "risk": "CRITICAL" }
+  ],
+  "critical_count": 1
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-post">POST</span>
+    <span class="path">/v1/vos/aviso/draft</span>
+    <span class="description">PROC-002: Draft threshold aviso (reads entity thresholds from DB)</span>
+    <span class="tag tag-vos">vos</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>Request:</strong> <code>{"entity_slug": "vortex-pay", "fee_type": "FX Fee", "amount": 50000}</code>
+    <strong>Response:</strong>
+    <pre>{
+  "reportable": true,
+  "threshold_value": 21890.40,
+  "draft_xml": "&lt;aviso&gt;...&lt;/aviso&gt;",
+  "warning": null
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-post">POST</span>
+    <span class="path">/v1/vos/revenue/summary</span>
+    <span class="description">PROC-003: Pre-fill tax return revenue lines</span>
+    <span class="tag tag-vos">vos</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>Request:</strong> <code>{"entity_slug": "vortex-pay", "year": 2025}</code>
+    <strong>Response:</strong>
+    <pre>{
+  "lines": [
+    { "fee_type": "FX Fees", "entity_pct": 100, "included": true },
+    { "fee_type": "Crypto Revenue", "included": false, "reason_excluded": "Crypto revenue may NOT be recorded" }
+  ],
+  "filing_deadline": "2026-03-31"
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-post">POST</span>
+    <span class="path">/v1/vos/compliance/check</span>
+    <span class="description">PROC-004: Run DB-configured compliance rules</span>
+    <span class="tag tag-vos">vos</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>Response:</strong>
+    <pre>{
+  "overall_status": "FLAGGED",
+  "rules_total": 6, "compliant": 4, "flagged": 2,
+  "rules": [
+    { "rule_id": "RULE-001", "name": "No Crypto Revenue", "status": "COMPLIANT", "severity": "CRITICAL" },
+    { "rule_id": "RULE-003", "name": "Settlement Channel Active", "status": "FLAGGED", "severity": "HIGH" }
+  ]
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-post">POST</span>
+    <span class="path">/v1/vos/poa/status</span>
+    <span class="description">PROC-005: POA / e-firma transfer status</span>
+    <span class="tag tag-vos">vos</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>Response:</strong>
+    <pre>{ "overall_status": "IN_PROGRESS", "steps": [
+  { "step": 1, "name": "POA drafted", "status": "COMPLETE" },
+  { "step": 6, "name": "e-firma transfer", "status": "PENDING" }
+]}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-post">POST</span>
+    <span class="path">/v1/vos/cnbv/status</span>
+    <span class="description">PROC-006: Regulatory body registration (CNBV/MAS/FCA/etc)</span>
+    <span class="tag tag-vos">vos</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>Response:</strong>
+    <pre>{ "registration_status": "IN_PROGRESS", "estimated_months": 10, "obligations": [
+  { "name": "AML Policy", "status": "SUBMITTED" }, { "name": "Annex 4/5", "status": "IN_PREPARATION" }
+]}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-post">POST</span>
+    <span class="path">/v1/vos/settlement/status</span>
+    <span class="description">PROC-007: Settlement channel status and alternatives</span>
+    <span class="tag tag-vos">vos</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>Response:</strong>
+    <pre>{ "primary_bank_status": "DEACTIVATED", "alternative_channels": ["Clabe Receivables"], "risk_level": "HIGH" }</pre>
+  </div>
+</div>
+
+<h2>Transaction Monitoring</h2>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-post">POST</span>
+    <span class="path">/v1/tx/ingest</span>
+    <span class="description">Ingest transaction — auto-evaluates thresholds</span>
+    <span class="tag tag-tx">tx</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>Request:</strong>
+    <pre>{ "tx_id": "TX-001", "amount": 50000, "fee_type": "FX Fee", "counterparty": "Merchant ABC" }</pre>
+    <strong>Response:</strong>
+    <pre>{ "tx_id": "TX-001", "threshold_flag": true, "status": "flagged",
+  "threshold_reason": "FX fee 50000.00 exceeds PLD threshold (21890.40)" }</pre>
+  </div>
+</div>
+
+<h2>Natural Language</h2>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-post">POST</span>
+    <span class="path">/v1/nl/query</span>
+    <span class="description">Natural language query — auto-routes to procedures</span>
+    <span class="tag tag-nl">nl</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>Request:</strong>
+    <pre>{ "query": "What AML filings are due in 30 days?", "entity_slug": "vortex-pay" }</pre>
+    <strong>Response:</strong>
+    <pre>{ "query": "What AML filings are due in 30 days?",
+  "procedure_triggered": "PROC-001",
+  "response": "Found 2 critical obligations in the next 30 days. Total due: 5.",
+  "confidence": 0.92, "sources": ["compliance_calendar"] }</pre>
+    <strong>Keywords:</strong> "deadline", "filing", "due" &rarr; PROC-001 | "aviso", "threshold" &rarr; PROC-002 | "revenue", "tax", "isr" &rarr; PROC-003 | "intercompany", "compliance" &rarr; PROC-004 | "poa" &rarr; PROC-005 | "cnbv", "mas" &rarr; PROC-006 | "settlement" &rarr; PROC-007
+  </div>
+</div>
+
+<h2>Ingestion Pipeline</h2>
+
+<div class="endpoint">
+  <div class="endpoint-header" onclick="this.nextElementSibling.classList.toggle('active')">
+    <span class="method method-post">POST</span>
+    <span class="path">/v1/ingest/text</span>
+    <span class="description">Ingest regulation text into ChromaDB for RAG</span>
+    <span class="tag tag-ingest">ingest</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>Request:</strong>
+    <pre>{ "entity_slug": "vortex-pay", "jurisdiction_code": "MEX", "title": "LFPIORPI Art 17", "text": "Article 17..." }</pre>
+    <strong>Response:</strong> <code>{ "doc_id": "vortex-pay_MEX_20260521", "chunks_stored": 12, "total_chars": 15420 }</code>
+  </div>
+</div>
+
+<h2>Call Flow Diagrams</h2>
+
+<h3>Flow 1: NL Query &rarr; Procedure</h3>
+<div class="flow-box">
+<pre>User: "What AML filings are due?"
+  &darr;
+POST /v1/nl/query { "query": "What AML filings are due?", "entity_slug": "vortex-pay" }
+  &darr;
+[Keyword: "filing", "due" matches intent "deadlines"]
+  &darr;
+&rarr; PROC-001 triggered &rarr; RIE Agent &rarr; entity_manager.get_obligations() &rarr; DeadlineResponse
+  &darr;
+{ "procedure_triggered": "PROC-001", "response": "Found 2 critical obligations...", "confidence": 0.92 }</pre>
+</div>
+
+<h3>Flow 2: TX Ingest &rarr; Threshold Breach</h3>
+<div class="flow-box">
+<pre>POST /v1/tx/ingest { "tx_id": "TX-001", "amount": 50000, "fee_type": "FX Fee" }
+  &darr;
+TMA Agent &rarr; entity_manager.get_thresholds(entity_id, "MEX")
+  &rarr; PLD Single Transaction = 21890.40 MXN
+  &rarr; 50000 &ge; 21890.40 = BREACHED
+  &darr;
+{ "threshold_flag": true, "status": "flagged", "threshold_reason": "..." }
+  &darr;
+Auto: db.log_risk_event(entity_id, "THRESHOLD", "HIGH", ...)</pre>
+</div>
+
+<h3>Flow 3: New Client Onboarding</h3>
+<div class="flow-box">
+<pre>POST /v1/entities { "slug": "acme-corp", "name": "Acme Corp" }
+  &darr;
+EntityManager.create_entity() &rarr; entity_id = 3
+  &darr;
+(Direct DB or future API)
+  create_jurisdiction("USA", "United States")
+  create_threshold("BSA Reporting", 10000, "USD", entity_id=3)
+  create_obligation("FINCEN-001", "CTR Report", ..., entity_id=3)
+  create_rule("NO-ANON", "No Anonymous Accounts", ..., entity_id=3)
+  &darr;
+evan query -e acme-corp "What filings are due?" &rarr; Acme Corp's data only</pre>
+</div>
+
+<h2>Schema Registry</h2>
+
+<table class="schema-table">
+<tr><th>Schema</th><th>Type</th><th>Key Fields</th></tr>
+<tr><td>HealthResponse</td><td>Response</td><td>status, uptime_seconds, agents_ready</td></tr>
+<tr><td>AgentStatusResponse</td><td>Response</td><td>agents[], system_health</td></tr>
+<tr><td>Entity / EntityCreateRequest</td><td>Both</td><td>slug, name, legal_name, industry</td></tr>
+<tr><td>DeadlineRequest</td><td>Request</td><td>entity_slug, jurisdiction_code, days_ahead</td></tr>
+<tr><td>DeadlineResponse</td><td>Response</td><td>items[], critical_count</td></tr>
+<tr><td>DeadlineItem</td><td>Nested</td><td>obligation, domain, due_date, priority, risk</td></tr>
+<tr><td>AvisoRequest</td><td>Request</td><td>entity_slug, fee_type, amount, currency</td></tr>
+<tr><td>AvisoResponse</td><td>Response</td><td>reportable, threshold_value, draft_xml</td></tr>
+<tr><td>RevenueRequest</td><td>Request</td><td>entity_slug, year</td></tr>
+<tr><td>RevenueResponse</td><td>Response</td><td>lines[], total_entity_revenue, filing_deadline</td></tr>
+<tr><td>ComplianceCheckRequest</td><td>Request</td><td>entity_slug, jurisdiction_code</td></tr>
+<tr><td>ComplianceCheckResponse</td><td>Response</td><td>overall_status, rules_total, compliant, flagged, rules[]</td></tr>
+<tr><td>ComplianceRuleResult</td><td>Nested</td><td>rule_id, name, status, severity, detail</td></tr>
+<tr><td>NLQueryRequest</td><td>Request</td><td>query, entity_slug, jurisdiction_code</td></tr>
+<tr><td>NLQueryResponse</td><td>Response</td><td>procedure_triggered, response, confidence, sources[]</td></tr>
+<tr><td>TransactionIngest</td><td>Request</td><td>tx_id, amount, fee_type, counterparty</td></tr>
+<tr><td>IngestRequest</td><td>Request</td><td>entity_slug, jurisdiction_code, title, text</td></tr>
+<tr><td>IngestResponse</td><td>Response</td><td>doc_id, chunks_stored, total_chars</td></tr>
+</table>
+
+<h2>Error Codes</h2>
+
+<table class="schema-table">
+<tr><th>HTTP</th><th>Meaning</th><th>When</th></tr>
+<tr><td>200</td><td>OK</td><td>Success</td></tr>
+<tr><td>401</td><td>Unauthorized</td><td>Auth header missing/wrong (production only)</td></tr>
+<tr><td>404</td><td>Not Found</td><td>Entity slug doesn't exist</td></tr>
+<tr><td>422</td><td>Validation Error</td><td>Pydantic schema mismatch</td></tr>
+<tr><td>500</td><td>Server Error</td><td>Agent, DB, or Chroma failure</td></tr>
+</table>
+
+<div class="footer">
+  Evan Copilot Framework v3.0.0-generic | Proprietary &copy; 2026 Evan | <a href="/openapi.json" style="color:var(--amber)">Download OpenAPI Spec</a>
+</div>
+
+</div>
+</body>
+</html>
