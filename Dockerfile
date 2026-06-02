@@ -7,6 +7,8 @@ RUN pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
 
 FROM python:3.12-slim AS runtime
 
+RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd -r evan && useradd -r -g evan evan
 
 WORKDIR /app
