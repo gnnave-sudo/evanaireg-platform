@@ -692,7 +692,7 @@ function NLCommandCenter() {
               AI Voice Engine
             </span>
             <span className="font-mono text-[11px] text-soft-cream bg-surface-dark border border-subtle-line px-3 py-1 rounded-md">
-              Jamie API
+              LLM Engine
             </span>
             <span className="font-mono text-[11px] text-soft-cream bg-surface-dark border border-subtle-line px-3 py-1 rounded-md">
               Gemini 2.5 Pro
@@ -1697,7 +1697,7 @@ function InstallationSection() {
               Install EvanAIRegPlatform
             </h2>
             <p className="font-body text-[16px] md:text-[18px] text-muted-sand max-w-[560px] mx-auto">
-              One command to get the full unified stack — AI Engine + Quant Stack + Contract Workbench, running locally.
+              One command to get the full unified stack — AI Engine + Quant Stack + Platform Dashboard, running locally.
             </p>
           </div>
 

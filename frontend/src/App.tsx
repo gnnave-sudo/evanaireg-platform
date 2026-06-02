@@ -1,9 +1,7 @@
-import { Component, type ReactNode, lazy, Suspense, useEffect } from 'react'
+import { Component, type ReactNode, useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
 import EvanAI from './pages/EvanAI'
-
-const ContractWorkbench = lazy(() => import('@/sections/ContractWorkbench'))
 
 /* ===== Scroll to top on route change ===== */
 function ScrollToTop() {
@@ -74,34 +72,12 @@ class ErrorBoundary extends Component<
   }
 }
 
-function WorkbenchFallback() {
-  return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-5">
-      <div className="relative mb-4">
-        <div className="w-12 h-12 rounded-xl border-2 border-warm-amber/30 border-t-warm-amber animate-spin" />
-      </div>
-      <p className="font-body text-[16px] text-muted-sand mb-1">Loading Contract Workbench...</p>
-      <p className="font-mono text-[12px] text-muted-sand/50">Initializing modules and AI models</p>
-    </div>
-  )
-}
-
 export default function App() {
   return (
     <ErrorBoundary>
       <Layout>
         <ScrollToTop />
         <Routes>
-          <Route
-            path="/workbench"
-            element={
-              <PageTransition>
-                <Suspense fallback={<WorkbenchFallback />}>
-                  <ContractWorkbench />
-                </Suspense>
-              </PageTransition>
-            }
-          />
           <Route path="*" element={<PageTransition><EvanAI /></PageTransition>} />
         </Routes>
       </Layout>

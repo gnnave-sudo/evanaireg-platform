@@ -59,11 +59,11 @@ export default function Footer() {
               Unified compliance and contract lifecycle platform. Regulatory intelligence powered by AI.
             </p>
             <Link
-              to="/workbench"
+              to="/"
               className="inline-flex items-center gap-1.5 font-mono text-[11px] text-warm-amber bg-warm-amber/10 border border-warm-amber/20 px-3 py-1.5 rounded-lg hover:bg-warm-amber/20 transition-all"
             >
               <Briefcase size={12} />
-              Contract Workbench
+              Contract Dashboard
             </Link>
           </div>
 
@@ -71,11 +71,11 @@ export default function Footer() {
           <div>
             <h4 className="font-body font-semibold text-sm text-soft-cream mb-4">Product</h4>
             <ul className="space-y-3">
-              {['Features', 'Integrations', 'Workbench', 'Changelog'].map((item) => (
+              {['Features', 'Integrations', 'Dashboard', 'Changelog'].map((item) => (
                 <li key={item}>
-                  {item === 'Workbench' ? (
+                  {item === 'Dashboard' ? (
                     <Link
-                      to="/workbench"
+                      to="/"
                       className="font-body text-sm text-muted-sand hover:text-soft-cream transition-colors duration-200"
                     >
                       {item}

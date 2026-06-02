@@ -10,11 +10,14 @@ class EntityManager:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def create_entity(self, slug: str, name: str, legal_name: str = None, industry: str = None, metadata: dict = None):
+    def create_entity(self, slug: str, name: str, legal_name: str = None, industry: str = None,
+                      entity_type: str = "company", status: str = "active", metadata: dict = None):
         conn = self._conn()
         c = conn.cursor()
-        c.execute("INSERT OR REPLACE INTO entities (slug, name, legal_name, industry, metadata) VALUES (?, ?, ?, ?, ?)",
-                  (slug, name, legal_name, industry, json.dumps(metadata or {})))
+        c.execute(
+            "INSERT OR REPLACE INTO entities (slug, name, legal_name, industry, entity_type, status, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (slug, name, legal_name, industry, entity_type, status, json.dumps(metadata or {}))
+        )
         conn.commit()
         conn.close()
         return {"slug": slug, "name": name}

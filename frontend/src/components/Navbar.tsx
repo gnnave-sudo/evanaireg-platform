@@ -31,7 +31,7 @@ export default function Navbar() {
   const navLinks = [
     { label: 'Features', href: '#features' },
     { label: 'Stack', href: '#stack' },
-    { label: 'Workbench', href: '/workbench', route: true },
+    { label: 'Dashboard', href: '/workbench', route: true },
     { label: 'Docs', href: 'https://docs.evanairegplatform.ai', external: true },
     { label: 'GitHub', href: 'https://github.com/evanairegplatform', external: true },
   ]

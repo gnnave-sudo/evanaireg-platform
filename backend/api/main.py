@@ -1,6 +1,6 @@
 import os, sys, sqlite3, json, hashlib
-from datetime import datetime
-from fastapi import FastAPI, HTTPException, Header
+from datetime import datetime, timezone
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,9 +9,17 @@ from contextlib import asynccontextmanager
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.models import *
 from core.entity_manager import EntityManager
+from core.llm_client import LLMClient
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "evanaireg.db")
 API_KEY = os.environ.get("API_KEY", "evan-x870-local-key")
+
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -73,14 +81,23 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     yield
 
+
 app = FastAPI(title="EvanAIRegPlatform", version="1.0.0", lifespan=lifespan)
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 def verify_key(authorization: str = Header(None)):
     if not authorization:
@@ -90,225 +107,254 @@ def verify_key(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid API key")
     return parts[1]
 
+
 em = EntityManager(DB_PATH)
+llm = LLMClient()
+
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "version": "1.0.0", "platform": "EvanAIRegPlatform", "owner": "Evan (Proprietary)"}
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "platform": "EvanAIRegPlatform",
+        "owner": "Evan (Proprietary)",
+        "llm_available": llm.is_available(),
+    }
 
-@app.get("/v1/agents/status")
+
+@app.get("/v1/agents/status", dependencies=[Depends(verify_key)])
 def agents_status():
-    return {"agents": [
-        {"name": "RIE", "status": "active", "procedures": 3, "description": "Regulatory Intelligence Engine"},
-        {"name": "TMA", "status": "active", "procedures": 3, "description": "Transaction Monitoring Agent"},
-        {"name": "RE", "status": "active", "procedures": 4, "description": "Reporting Engine"},
-        {"name": "ICCA", "status": "active", "procedures": 4, "modules": ["DocumentReview", "SimulationLab", "TabularExtractor", "SignatureEngine"], "description": "Contract & Compliance Agent"}
-    ]}
+    return {
+        "agents": [
+            {"name": "RIE", "status": "active", "procedures": 3, "description": "Regulatory Intelligence Engine"},
+            {"name": "TMA", "status": "active", "procedures": 3, "description": "Transaction Monitoring Agent"},
+            {"name": "RE", "status": "active", "procedures": 4, "description": "Reporting Engine"},
+            {"name": "ICCA", "status": "active", "procedures": 4, "description": "Contract & Compliance Agent"},
+        ]
+    }
+
 
 @app.post("/v1/entities")
 def create_entity(entity: EntityCreate):
     return em.create_entity(**entity.model_dump())
 
+
 @app.get("/v1/entities")
 def list_entities():
     return {"entities": em.list_entities()}
 
+
+@app.get("/v1/entities/{slug}")
+def get_entity(slug: str):
+    entity = em.get_entity(slug)
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    return entity
+
+
+# ─── NL QUERY ───
 @app.post("/v1/nl/query")
 def nl_query(query: NLQueryRequest):
     q = query.query.lower()
+
+    # Fast-path keyword intents
     intents = {
-        "deadline": ("RIE", "deadline_scan", "No upcoming deadlines. All filings are current."),
-        "filing": ("RIE", "deadline_scan", "Next filing: Annual Report due March 1."),
-        "compliance": ("ICCA", "compliance_check", "Compliance check passed. All rules satisfied."),
-        "threshold": ("TMA", "threshold_check", "No threshold breaches detected."),
-        "revenue": ("RE", "revenue_summary", "Q2 revenue: $2.4M. No fee reconciliation issues."),
-        "tax": ("RE", "tax_prefill", "Tax prefill data ready for 4 entities."),
-        "redline": ("ICCA", "redline", "Use the Contract Workbench Redline tab to compare documents."),
-        "compare": ("ICCA", "redline", "Opening Document Review module. Upload two documents to compare."),
-        "simulate": ("ICCA", "simulate", "Opening Simulation Lab. Configure opposing counsel profile and run."),
-        "negotiation": ("ICCA", "simulate", "Opening Simulation Lab. Configure opposing counsel profile and run."),
-        "stress": ("ICCA", "simulate", "Opening Simulation Lab. Configure opposing counsel profile and run."),
-        "opposing": ("ICCA", "simulate", "Opening Simulation Lab. Configure opposing counsel profile and run."),
-        "tabular": ("ICCA", "tabular", "Use the Tabular tab to define extraction schemas."),
-        "extract": ("ICCA", "tabular", "Use the Tabular tab to define extraction schemas and extract data."),
-        "structured": ("ICCA", "tabular", "Use the Tabular tab for structured data extraction."),
-        "signature": ("ICCA", "signature", "Use the Signatures tab for closing packet automation."),
-        "signing": ("ICCA", "signature", "Use the Signatures tab for closing packet automation."),
-        "chart": ("RIE", "chart", "Use the Charts tab to generate corporate structure diagrams."),
-        "structure": ("RIE", "chart", "Use the Charts tab to generate corporate structure diagrams."),
-        "org": ("RIE", "chart", "Use the Charts tab to generate corporate structure diagrams."),
-        "quick": ("ICCA", "redlinenow", "Opening Quick Compare. Paste two text blocks for instant comparison."),
-        "clause": ("ICCA", "redlinenow", "Opening Quick Compare for clause-level analysis."),
+        "deadline": ("RIE", "deadline_scan"),
+        "filing": ("RIE", "deadline_scan"),
+        "compliance": ("ICCA", "compliance_check"),
+        "threshold": ("TMA", "threshold_check"),
+        "revenue": ("RE", "revenue_summary"),
+        "tax": ("RE", "tax_prefill"),
     }
-    for keyword, (agent, intent, response) in intents.items():
+    matched_agent = None
+    matched_intent = None
+    for keyword, (agent, intent) in intents.items():
         if keyword in q:
-            return {"agent": agent, "intent": intent, "response": response, "confidence": 0.95, "entity": query.entity_slug}
-    return {"agent": "ICCA", "intent": "general", "response": f"Query received: '{query.query}'. Use the Contract Workbench tabs for document operations, or ask about deadlines, compliance, thresholds, or revenue.", "confidence": 0.7, "entity": query.entity_slug}
+            matched_agent = agent
+            matched_intent = intent
+            break
+
+    # LLM-powered response generation
+    if llm.is_available():
+        system_prompt = (
+            "You are EvanAIRegPlatform, a regulatory compliance AI. "
+            "Respond concisely to the user's query about their entity."
+        )
+        user_prompt = f"Entity: {query.entity_slug}\nQuery: {query.query}"
+        try:
+            llm_response = llm.generate(user_prompt, system=system_prompt)
+            return {
+                "agent": matched_agent or "ICCA",
+                "intent": matched_intent or "general",
+                "response": llm_response,
+                "confidence": 0.92,
+                "entity": query.entity_slug,
+                "source": "llm",
+            }
+        except Exception as e:
+            return {
+                "agent": matched_agent or "ICCA",
+                "intent": matched_intent or "general",
+                "response": f"LLM error: {e}. Try again later.",
+                "confidence": 0.5,
+                "entity": query.entity_slug,
+                "source": "fallback",
+            }
+
+    # Fallback without LLM
+    fallback_responses = {
+        "deadline_scan": "No upcoming deadlines. All filings are current.",
+        "compliance_check": "Compliance check passed. All rules satisfied.",
+        "threshold_check": "No threshold breaches detected.",
+        "revenue_summary": "Q2 revenue: $2.4M. No fee reconciliation issues.",
+        "tax_prefill": "Tax prefill data ready for 4 entities.",
+    }
+    response = fallback_responses.get(matched_intent, f"Query received: '{query.query}'. Ask about deadlines, compliance, thresholds, or revenue.")
+    return {
+        "agent": matched_agent or "ICCA",
+        "intent": matched_intent or "general",
+        "response": response,
+        "confidence": 0.7,
+        "entity": query.entity_slug,
+        "source": "keyword",
+    }
+
 
 # ─── VOS PROCEDURES ───
 @app.post("/v1/vos/deadlines")
 def vos_deadlines(query: NLQueryRequest):
-    return {"entity_slug": query.entity_slug, "deadlines": [], "next_review": "2026-06-15"}
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, rule_name, jurisdiction_code, severity, status FROM compliance_rules WHERE status='active' ORDER BY created_at DESC LIMIT 10"
+    )
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return {"entity_slug": query.entity_slug, "deadlines": rows, "next_review": "2026-06-15"}
+
 
 @app.post("/v1/vos/aviso/draft")
 def vos_aviso(query: NLQueryRequest):
+    if llm.is_available():
+        try:
+            draft = llm.generate(
+                f"Draft a privacy notice (aviso de privacidad) for entity {query.entity_slug}",
+                system="You are a Mexican regulatory lawyer. Draft concise privacy notices in Spanish."
+            )
+            return {"entity_slug": query.entity_slug, "draft": draft, "word_count": len(draft.split())}
+        except Exception:
+            pass
     return {"entity_slug": query.entity_slug, "draft": "Aviso de privacidad template", "word_count": 450}
+
 
 @app.post("/v1/vos/revenue/summary")
 def vos_revenue(query: NLQueryRequest):
-    return {"entity_slug": query.entity_slug, "total_revenue": 2400000, "period": "Q2 2026", "currency": "USD"}
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "SELECT SUM(amount) as total FROM transactions WHERE entity_id=(SELECT id FROM entities WHERE slug=?) AND timestamp > date('now', '-90 days')",
+        (query.entity_slug,),
+    )
+    row = c.fetchone()
+    conn.close()
+    total = row["total"] or 0
+    return {"entity_slug": query.entity_slug, "total_revenue": total, "period": "Last 90 days", "currency": "USD"}
+
 
 @app.post("/v1/vos/compliance/check")
 def vos_compliance(query: NLQueryRequest):
-    return {"entity_slug": query.entity_slug, "compliance_score": 0.94, "flagged_rules": [], "status": "COMPLIANT"}
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "SELECT COUNT(*) as total FROM compliance_rules WHERE entity_id=(SELECT id FROM entities WHERE slug=?) AND status='active'",
+        (query.entity_slug,),
+    )
+    total = c.fetchone()["total"]
+    c.execute(
+        "SELECT COUNT(*) as flagged FROM compliance_rules WHERE entity_id=(SELECT id FROM entities WHERE slug=?) AND status='violated'",
+        (query.entity_slug,),
+    )
+    flagged = c.fetchone()["flagged"]
+    conn.close()
+    score = 1.0 if total == 0 else 1.0 - (flagged / total)
+    return {"entity_slug": query.entity_slug, "compliance_score": round(score, 2), "flagged_rules": flagged, "status": "COMPLIANT" if flagged == 0 else "FLAGGED"}
+
 
 @app.post("/v1/vos/poa/status")
 def vos_poa(query: NLQueryRequest):
     return {"entity_slug": query.entity_slug, "active_poas": 3, "expiring_soon": 0}
 
+
 @app.post("/v1/vos/cnbv/status")
 def vos_cnbv(query: NLQueryRequest):
     return {"entity_slug": query.entity_slug, "cnbv_status": "active", "last_filing": "2026-04-15"}
+
 
 @app.post("/v1/vos/settlement/status")
 def vos_settlement(query: NLQueryRequest):
     return {"entity_slug": query.entity_slug, "settlement_channel": "active", "pending_settlements": 2}
 
+
 # ─── TRANSACTIONS ───
 @app.post("/v1/tx/ingest")
 def tx_ingest(tx: dict):
+    conn = get_db()
+    c = conn.cursor()
+    entity_slug = tx.get("entity_slug", "")
+    c.execute("SELECT id FROM entities WHERE slug=?", (entity_slug,))
+    row = c.fetchone()
+    entity_id = row["id"] if row else None
+    if entity_id:
+        c.execute(
+            "INSERT INTO transactions (entity_id, tx_type, amount, currency, timestamp, counterparty, description, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (entity_id, tx.get("tx_type"), tx.get("amount"), tx.get("currency"), tx.get("timestamp"), tx.get("counterparty"), tx.get("description"), json.dumps(tx.get("metadata", {}))),
+        )
+        conn.commit()
+    conn.close()
     return {"status": "ingested", "tx_id": hashlib.sha256(str(tx).encode()).hexdigest()[:12]}
+
 
 @app.get("/v1/tx/recent")
 def tx_recent(entity_slug: str = ""):
-    return {"transactions": []}
+    conn = get_db()
+    c = conn.cursor()
+    if entity_slug:
+        c.execute(
+            "SELECT t.* FROM transactions t JOIN entities e ON t.entity_id=e.id WHERE e.slug=? ORDER BY t.created_at DESC LIMIT 50",
+            (entity_slug,),
+        )
+    else:
+        c.execute("SELECT t.* FROM transactions t ORDER BY t.created_at DESC LIMIT 50")
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return {"transactions": rows}
+
 
 # ─── INGESTION ───
 @app.post("/v1/ingest/text")
 def ingest_text(req: IngestRequest):
-    return {"status": "ingested", "chunks": 5, "doc_id": req.doc_id, "collection": f"regulations_{req.entity_slug}"}
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT id FROM entities WHERE slug=?", (req.entity_slug,))
+    row = c.fetchone()
+    entity_id = row["id"] if row else None
+    if entity_id:
+        doc_slug = req.doc_id or f"doc-{hashlib.sha256(req.text.encode()).hexdigest()[:12]}"
+        c.execute(
+            "INSERT OR REPLACE INTO documents (entity_id, doc_slug, doc_type, title, parsed_text, parsed_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (entity_id, doc_slug, "text", req.title, req.text, datetime.now(timezone.utc).isoformat(), json.dumps({"jurisdiction": req.jurisdiction_code})),
+        )
+        conn.commit()
+    conn.close()
+    chunks = max(1, len(req.text) // 1000)
+    return {"status": "ingested", "chunks": chunks, "doc_id": req.doc_id or doc_slug, "collection": f"regulations_{req.entity_slug}"}
 
-# ─── JAMIE REDLINE ENDPOINTS ───
-@app.post("/v1/jamie/redline/compare")
-def redline_compare(req: RedlineCompareRequest):
-    # Simple diff
-    words_a = req.doc_a_text.split()
-    words_b = req.doc_b_text.split()
-    inserts = abs(len(words_b) - len(words_a))
-    sess_id = hashlib.sha256(f"{req.doc_a_text}{req.doc_b_text}".encode()).hexdigest()[:12]
-    return {"session_id": f"r-{sess_id}", "status": "completed", "diff_blocks": [
-        {"type": "info", "text": f"Document A: {len(words_a)} words, Document B: {len(words_b)} words"}
-    ], "stats": {"inserts": inserts, "deletes": 0, "modifies": min(len(words_a), len(words_b)) // 10, "unchanged": min(len(words_a), len(words_b))}}
-
-@app.post("/v1/jamie/redline/{session_id}/chat")
-def redline_chat(session_id: str, req: dict):
-    return {"reply": f"Analysis of session {session_id}: The documents show significant differences in structure and content. Review flagged sections carefully.", "confidence": 0.92}
-
-@app.get("/v1/jamie/redline/sessions")
-def redline_sessions():
-    return {"sessions": []}
-
-@app.post("/v1/jamie/redline/clauses")
-def redline_clauses(req: dict):
-    return {"session_id": f"c-{hashlib.sha256(str(req).encode()).hexdigest()[:12]}", "analysis": "Clause comparison completed. Review risk assessment below.", "overall_risk": "MEDIUM"}
-
-@app.post("/v1/jamie/redline/emails")
-def redline_emails(req: dict):
-    return {"session_id": f"e-{hashlib.sha256(str(req).encode()).hexdigest()[:12]}", "commitments_extracted": [], "diff_blocks": []}
-
-@app.post("/v1/jamie/redline/regulatory-compare")
-def redline_regulatory(req: dict):
-    return {"session_id": f"rc-{hashlib.sha256(str(req).encode()).hexdigest()[:12]}", "regulatory_matches": [], "compliance_risk": "LOW"}
-
-# ─── JAMIE SIMULATION ENDPOINTS ───
-@app.post("/v1/jamie/simulate/run")
-def simulate_run(req: SimulationRunRequest):
-    rid = hashlib.sha256(f"{req.contract_text}{req.scenario}".encode()).hexdigest()[:12]
-    return {"run_id": f"s-{rid}", "status": "completed", "scenario": req.scenario, "agent_positions": [
-        {"agent": "Opposing Counsel", "position": "Aggressive", "arguments": ["Seeking maximum concessions on liability caps", "Pushing for shorter termination notice periods"], "score": 0.75},
-        {"agent": "Business Advocate", "position": "Defensive", "arguments": ["Protecting core IP rights", "Maintaining favorable payment terms"], "score": 0.65},
-        {"agent": "Arbiter", "position": "Neutral", "arguments": ["Both parties have valid concerns", "Recommend middle ground on liability"], "score": 0.80}
-    ], "overall_risk_score": 0.55, "recommendation": "PROCEED", "stress_report": {"contractual_risk": 0.45, "regulatory_compliance": 0.92, "commercial_impact": 0.60, "enforceability": 0.78, "reputational_exposure": 0.30}}
-
-@app.post("/v1/jamie/simulate/{run_id}/amendments")
-def simulate_amendments(run_id: str, req: dict = None):
-    return {"amendment_id": f"a-{run_id[-8:]}", "status": "generated", "changes": 3, "risk_reduction": 0.15, "redlined_doc_url": f"/v1/jamie/redline/export/{run_id}"}
-
-@app.get("/v1/jamie/simulate/runs")
-def simulate_runs():
-    return {"runs": []}
-
-@app.post("/v1/jamie/simulate/batch")
-def simulate_batch(req: dict):
-    return {"batch_id": f"b-{hashlib.sha256(str(req).encode()).hexdigest()[:8]}", "runs_completed": len(req.get("scenarios", [])), "aggregate_report": {"overall_risk": 0.52, "consensus_recommendation": "PROCEED"}}
-
-# ─── JAMIE TABULAR ENDPOINTS ───
-@app.post("/v1/jamie/tabular/schema/define")
-def tabular_schema(req: dict):
-    sid = hashlib.sha256(str(req).encode()).hexdigest()[:12]
-    return {"schema_id": f"ts-{sid}", "status": "defined", "columns_count": len(req.get("columns", [])), "schema_name": req.get("schema_name", "custom")}
-
-@app.post("/v1/jamie/tabular/extract")
-def tabular_extract(req: TabularExtractRequest):
-    xid = hashlib.sha256(f"{req.doc_text}{req.schema_id}".encode()).hexdigest()[:12]
-    return {"extraction_id": f"tx-{xid}", "status": "completed", "rows_extracted": 5, "verification": {"passed": 4, "failed": 1, "failures": [{"row": 3, "column": "governing_law", "issue": "Ambiguous jurisdiction reference"}]}, "confidence_score": 0.92, "dataset": [{"row": 1, "party": "Licensor", "governing_law": "Delaware", "liability_cap": "$1M", "term": "3 years"}, {"row": 2, "party": "Licensee", "governing_law": "California", "liability_cap": "$500K", "term": "3 years"}]}
-
-@app.post("/v1/jamie/tabular/verify")
-def tabular_verify(req: dict):
-    return {"verification_id": f"v-{hashlib.sha256(str(req).encode()).hexdigest()[:12]}", "regulatory_matches": 3, "data_quality_score": 0.91}
-
-@app.get("/v1/jamie/tabular/export/{extraction_id}")
-def tabular_export(extraction_id: str, format: str = "csv"):
-    return {"download_url": f"/downloads/{extraction_id}.{format}", "format": format, "rows": 5, "expires_at": "2026-06-30T00:00:00Z"}
-
-# ─── JAMIE SIGNATURES ENDPOINTS ───
-@app.post("/v1/jamie/signatures/extract")
-def signatures_extract(req: SignatureExtractRequest):
-    pid = hashlib.sha256(req.doc_text.encode()).hexdigest()[:12]
-    return {"packet_id": f"sp-{pid}", "pages_analyzed": 24, "signature_pages_found": 4, "grouped_by_party": [{"party": "Acme Corp", "pages": [3, 4], "signature_type": "corporate"}, {"party": "Jane Smith (Individual)", "pages": [5], "signature_type": "individual"}, {"party": "John Doe (Witness)", "pages": [6], "signature_type": "witness"}], "notary_pages": [7], "confidence": 0.95}
-
-@app.post("/v1/jamie/signatures/packets/{packet_id}/export")
-def signatures_export(packet_id: str, req: dict = None):
-    return {"download_url": f"/downloads/{packet_id}.zip", "pages_included": 4, "file_size_mb": 2.1, "expires_at": "2026-06-30T00:00:00Z"}
-
-@app.post("/v1/jamie/signatures/verify")
-def signatures_verify(req: dict):
-    return {"complete": True, "missing": []}
-
-@app.post("/v1/jamie/signatures/instructions")
-def signatures_instructions(req: dict):
-    return {"instructions_id": f"i-{hashlib.sha256(str(req).encode()).hexdigest()[:12]}", "instruction_text": "Please sign all highlighted pages. Use blue ink. Return completed signatures within 5 business days.", "signing_table": [{"party": "Acme Corp", "signer": "CEO", "pages": "3-4"}, {"party": "Jane Smith", "signer": "Individual", "pages": "5"}]}
-
-# ─── JAMIE CHARTS ENDPOINTS ───
-@app.post("/v1/jamie/charts/generate")
-def charts_generate(req: ChartGenerateRequest):
-    cid = hashlib.sha256(f"{req.input_text}{req.chart_type}".encode()).hexdigest()[:12]
-    return {"chart_id": f"ch-{cid}", "status": "generated", "chart_type": req.chart_type, "nodes": [
-        {"id": "1", "label": "Holdings Ltd", "type": "parent", "pct": 100},
-        {"id": "2", "label": "Operating Co", "type": "subsidiary", "pct": 85},
-        {"id": "3", "label": "IP Sub", "type": "subsidiary", "pct": 100},
-        {"id": "4", "label": "Local SPV", "type": "spv", "pct": 15}
-    ], "edges": [
-        {"from": "1", "to": "2", "relationship": "owns", "pct": 85},
-        {"from": "1", "to": "3", "relationship": "owns", "pct": 100},
-        {"from": "2", "to": "4", "relationship": "owns", "pct": 15}
-    ], "confidence": 0.93}
-
-@app.post("/v1/jamie/charts/{chart_id}/refine")
-def charts_refine(chart_id: str, req: dict):
-    return {"chart_id": chart_id, "status": "refined", "changes_applied": 1, "instruction_applied": req.get("instruction", "")}
-
-@app.get("/v1/jamie/charts/export/{chart_id}")
-def charts_export(chart_id: str, format: str = "svg"):
-    return {"download_url": f"/downloads/{chart_id}.{format}", "format": format, "expires_at": "2026-06-30T00:00:00Z"}
-
-@app.get("/v1/jamie/charts")
-def charts_list():
-    return {"charts": []}
 
 # Serve frontend build
 DIST_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend/dist")
 app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
+
 
 @app.get("/{path:path}", include_in_schema=False)
 async def serve_spa(path: str):
@@ -318,6 +364,7 @@ async def serve_spa(path: str):
     if os.path.isfile(file_path):
         return FileResponse(file_path)
     return FileResponse(os.path.join(DIST_DIR, "index.html"))
+
 
 if __name__ == "__main__":
     import uvicorn
