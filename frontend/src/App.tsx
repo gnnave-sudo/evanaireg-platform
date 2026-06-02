@@ -3,6 +3,7 @@ import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import EvanAI from './pages/EvanAI'
 import Login from './pages/Login'
+import EntityDetail from './pages/EntityDetail'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 
 /* ===== Scroll to top on route change ===== */
@@ -75,6 +76,19 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route
+        path="/entities/:slug"
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <ScrollToTop />
+              <PageTransition><EntityDetail /></PageTransition>
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
       <Route
         path="*"
         element={

@@ -65,6 +65,51 @@ export interface Transaction {
   description: string
 }
 
+export interface Jurisdiction {
+  id: number
+  jurisdiction_code: string
+  jurisdiction_name: string
+  entity_type: string
+  status: string
+  registered_date: string
+}
+
+export interface Threshold {
+  id: number
+  threshold_type: string
+  threshold_value: number
+  unit: string
+  applies_to: string
+  jurisdiction_code: string
+  status: string
+}
+
+export interface EntityDetail extends Entity {
+  metadata?: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
 export async function nlQuery(entitySlug: string, query: string): Promise<NLQueryResponse> {
   return apiClient.post<NLQueryResponse>('/v1/nl/query', { entity_slug: entitySlug, query })
+}
+
+export async function getEntities(): Promise<{ entities: EntityDetail[] }> {
+  return apiClient.get('/v1/entities')
+}
+
+export async function getEntity(slug: string): Promise<EntityDetail> {
+  return apiClient.get(`/v1/entities/${slug}`)
+}
+
+export async function getEntityJurisdictions(slug: string): Promise<{ jurisdictions: Jurisdiction[] }> {
+  return apiClient.get(`/v1/entities/${slug}/jurisdictions`)
+}
+
+export async function getEntityRules(slug: string): Promise<{ rules: ComplianceRule[] }> {
+  return apiClient.get(`/v1/entities/${slug}/rules`)
+}
+
+export async function getEntityThresholds(slug: string): Promise<{ thresholds: Threshold[] }> {
+  return apiClient.get(`/v1/entities/${slug}/thresholds`)
 }

@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import type { NLQueryResponse } from '@/lib/api'
-import { nlQuery } from '@/lib/api'
+import { nlQuery, getEntities } from '@/lib/api'
+import { useNavigate } from 'react-router-dom'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -41,6 +42,7 @@ import {
   Send,
   CircleDot,
   Flag,
+  Building2,
 } from 'lucide-react'
 import {
   systemLayers,
@@ -1029,6 +1031,69 @@ function DriftWidget() {
   )
 }
 
+function EntityListWidget() {
+  const [entities, setEntities] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    getEntities()
+      .then((data) => setEntities(data.entities || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="bg-surface-dark border border-subtle-line rounded-xl p-5 h-full flex items-center justify-center">
+        <Activity size={16} className="text-warm-amber animate-spin mr-2" />
+        <span className="font-mono text-[11px] text-muted-sand">Loading entities…</span>
+      </div>
+    )
+  }
+
+  if (entities.length === 0) {
+    return (
+      <div className="bg-surface-dark border border-subtle-line rounded-xl p-5 h-full">
+        <div className="flex items-center gap-2 mb-3">
+          <Building2 size={18} className="text-warm-amber" />
+          <h3 className="font-body font-semibold text-[15px] text-soft-cream">Entities</h3>
+        </div>
+        <p className="font-body text-[13px] text-muted-sand">No entities found.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-surface-dark border border-subtle-line rounded-xl p-5 h-full">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Building2 size={18} className="text-warm-amber" />
+          <h3 className="font-body font-semibold text-[15px] text-soft-cream">Entities</h3>
+        </div>
+        <span className="font-mono text-[11px] text-muted-sand">{entities.length} total</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {entities.map((e) => (
+          <button
+            key={e.id}
+            onClick={() => navigate(`/entities/${e.slug}`)}
+            className="text-left p-3 bg-obsidian/50 rounded-lg border border-subtle-line/50 hover:border-warm-amber/40 transition-colors group"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Building2 size={14} className="text-warm-amber flex-shrink-0" />
+              <span className="font-body font-medium text-[13px] text-soft-cream truncate group-hover:text-warm-amber transition-colors">
+                {e.name}
+              </span>
+            </div>
+            <div className="font-mono text-[10px] text-muted-sand">{e.industry || '—'} • {e.status}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function DashboardSection() {
   const sectionRef = useRef<HTMLElement>(null)
   const headingRef = useRef<HTMLDivElement>(null)
@@ -1073,6 +1138,10 @@ function DashboardSection() {
         </div>
 
         <div ref={gridRef} className="space-y-6">
+          {/* Entity List */}
+          <div className="dash-panel">
+            <EntityListWidget />
+          </div>
           {/* Top Row: 2 columns */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="dash-panel">
