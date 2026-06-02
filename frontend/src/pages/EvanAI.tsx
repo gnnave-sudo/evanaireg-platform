@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
+import type { NLQueryResponse } from '@/lib/api'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -607,6 +608,34 @@ function NLCommandCenter() {
   const sectionRef = useRef<HTMLElement>(null)
   const headingRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  const [query, setQuery] = useState('')
+  const [response, setResponse] = useState<NLQueryResponse | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const submitQuery = async (text: string) => {
+    if (!text.trim()) return
+    setLoading(true)
+    setError('')
+    setResponse(null)
+    try {
+      const res = await fetch('/v1/nl/query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer evan-x870-local-key',
+        },
+        body: JSON.stringify({ query: text, entity_slug: 'vortex-pay' }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setResponse(data)
+    } catch (e: any) {
+      setError(e.message || 'Request failed')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -649,23 +678,43 @@ function NLCommandCenter() {
 
         <div ref={contentRef} className="max-w-[720px] mx-auto">
           {/* Input Area */}
-          <div className="nl-item bg-surface-dark border border-subtle-line rounded-xl p-4 mb-8 transition-all duration-300 hover:border-warm-amber/30">
+          <div className="nl-item bg-surface-dark border border-subtle-line rounded-xl p-4 mb-4 transition-all duration-300 hover:border-warm-amber/30">
             <div className="flex items-center gap-3">
               <Search size={18} className="text-muted-sand flex-shrink-0" />
               <input
                 type="text"
-                readOnly
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submitQuery(query)}
                 placeholder="e.g., 'What AML filings are due in 30 days?' or 'Check transaction TX-0042 for threshold status'"
                 className="flex-1 bg-transparent font-body text-[14px] text-soft-cream placeholder:text-muted-sand/50 outline-none"
               />
-              <button className="flex-shrink-0 w-9 h-9 rounded-lg bg-warm-amber/10 border border-warm-amber/20 flex items-center justify-center transition-all duration-200 hover:bg-warm-amber/20">
-                <Mic size={16} className="text-warm-amber" />
-              </button>
-              <button className="flex-shrink-0 w-9 h-9 rounded-lg bg-warm-amber text-obsidian flex items-center justify-center transition-all duration-200 hover:scale-[1.05]">
-                <Send size={16} />
+              <button
+                onClick={() => submitQuery(query)}
+                disabled={loading}
+                className="flex-shrink-0 w-9 h-9 rounded-lg bg-warm-amber text-obsidian flex items-center justify-center transition-all duration-200 hover:scale-[1.05] disabled:opacity-50"
+              >
+                {loading ? <span className="animate-spin">↻</span> : <Send size={16} />}
               </button>
             </div>
           </div>
+
+          {/* Response */}
+          {(response || error) && (
+            <div className="nl-item bg-surface-dark border border-subtle-line rounded-xl p-4 mb-8">
+              {error && <p className="text-red-400 text-sm">{error}</p>}
+              {response && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-warm-amber bg-warm-amber/10 border border-warm-amber/20 px-2 py-0.5 rounded">{response.agent}</span>
+                    <span className="font-mono text-[10px] text-muted-sand">{response.intent}</span>
+                    <span className="font-mono text-[10px] text-emerald-400">{(response.confidence * 100).toFixed(0)}% confidence</span>
+                  </div>
+                  <p className="font-body text-[14px] text-soft-cream leading-relaxed">{response.response}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Example Queries */}
           <div className="nl-item space-y-3 mb-8">
@@ -673,6 +722,7 @@ function NLCommandCenter() {
             {nlQueryExamples.map((ex, i) => (
               <div
                 key={i}
+                onClick={() => { setQuery(ex.query); submitQuery(ex.query); }}
                 className="group flex items-center gap-3 p-3 bg-surface-dark border border-subtle-line rounded-lg transition-all duration-200 hover:border-warm-amber/30 cursor-pointer"
               >
                 <span className="flex-1 font-body text-[13px] text-muted-sand group-hover:text-soft-cream transition-colors duration-200">
@@ -695,7 +745,7 @@ function NLCommandCenter() {
               LLM Engine
             </span>
             <span className="font-mono text-[11px] text-soft-cream bg-surface-dark border border-subtle-line px-3 py-1 rounded-md">
-              Gemini 2.5 Pro
+              Ollama qwen3
             </span>
           </div>
         </div>

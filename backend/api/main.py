@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.models import *
 from core.entity_manager import EntityManager
 from core.llm_client import LLMClient
+from core.document_parser import parse_document, summarize_document
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "evanaireg.db")
 API_KEY = os.environ.get("API_KEY", "evan-x870-local-key")
@@ -151,6 +152,64 @@ def get_entity(slug: str):
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
     return entity
+
+
+@app.put("/v1/entities/{slug}")
+def update_entity(slug: str, update: EntityUpdate):
+    entity = em.update_entity(slug, **update.model_dump(exclude_unset=True))
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    return entity
+
+
+@app.delete("/v1/entities/{slug}")
+def delete_entity(slug: str):
+    deleted = em.delete_entity(slug)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    return {"status": "deleted", "slug": slug}
+
+
+# ─── JURISDICTIONS ───
+@app.post("/v1/entities/{slug}/jurisdictions")
+def create_jurisdiction(slug: str, jurisdiction: JurisdictionCreate):
+    result = em.add_jurisdiction(slug, **jurisdiction.model_dump())
+    if not result:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    return result
+
+
+@app.get("/v1/entities/{slug}/jurisdictions")
+def list_jurisdictions(slug: str):
+    return {"jurisdictions": em.list_jurisdictions(slug)}
+
+
+# ─── COMPLIANCE RULES ───
+@app.post("/v1/entities/{slug}/rules")
+def create_rule(slug: str, rule: RuleCreate):
+    result = em.add_rule(slug, **rule.model_dump())
+    if not result:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    return result
+
+
+@app.get("/v1/entities/{slug}/rules")
+def list_rules(slug: str):
+    return {"rules": em.list_rules(slug)}
+
+
+# ─── THRESHOLDS ───
+@app.post("/v1/entities/{slug}/thresholds")
+def create_threshold(slug: str, threshold: ThresholdCreate):
+    result = em.add_threshold(slug, **threshold.model_dump())
+    if not result:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    return result
+
+
+@app.get("/v1/entities/{slug}/thresholds")
+def list_thresholds(slug: str):
+    return {"thresholds": em.list_thresholds(slug)}
 
 
 # ─── NL QUERY ───
@@ -339,16 +398,28 @@ def ingest_text(req: IngestRequest):
     c.execute("SELECT id FROM entities WHERE slug=?", (req.entity_slug,))
     row = c.fetchone()
     entity_id = row["id"] if row else None
+    doc_slug = req.doc_id or f"doc-{hashlib.sha256(req.text.encode()).hexdigest()[:12]}"
     if entity_id:
-        doc_slug = req.doc_id or f"doc-{hashlib.sha256(req.text.encode()).hexdigest()[:12]}"
+        # Parse document
+        parsed = parse_document(req.text, title=req.title)
+        summary = summarize_document(req.text, llm_client=llm)
+        metadata = {
+            "jurisdiction": req.jurisdiction_code,
+            "parsed": parsed,
+            "summary": summary,
+        }
         c.execute(
             "INSERT OR REPLACE INTO documents (entity_id, doc_slug, doc_type, title, parsed_text, parsed_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (entity_id, doc_slug, "text", req.title, req.text, datetime.now(timezone.utc).isoformat(), json.dumps({"jurisdiction": req.jurisdiction_code})),
+            (entity_id, doc_slug, "text", req.title or parsed.get("title", "Untitled"), req.text, datetime.now(timezone.utc).isoformat(), json.dumps(metadata)),
         )
         conn.commit()
     conn.close()
-    chunks = max(1, len(req.text) // 1000)
-    return {"status": "ingested", "chunks": chunks, "doc_id": req.doc_id or doc_slug, "collection": f"regulations_{req.entity_slug}"}
+    return {
+        "status": "ingested",
+        "doc_id": doc_slug,
+        "collection": f"regulations_{req.entity_slug}",
+        "parsed": parse_document(req.text, title=req.title),
+    }
 
 
 # Serve frontend build

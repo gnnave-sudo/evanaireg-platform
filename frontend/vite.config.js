@@ -8,6 +8,12 @@ export default defineConfig({
     plugins: [inspectAttr(), react()],
     server: {
         port: 3000,
+        proxy: {
+            '/v1': 'http://localhost:8100',
+            '/health': 'http://localhost:8100',
+            '/docs': 'http://localhost:8100',
+            '/openapi.json': 'http://localhost:8100',
+        },
     },
     resolve: {
         alias: {
