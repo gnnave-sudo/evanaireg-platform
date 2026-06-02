@@ -1,0 +1,44 @@
+name: Deploy to VPS
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy EvanAIRegPlatform
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 15m
+          script_stop: true
+          script: |
+            cd /opt/evanaireg-platform || { echo "FATAL: /opt/evanaireg-platform not found"; exit 1; }
+            echo "Working dir: $(pwd)"
+
+            echo "=== Pulling latest code ==="
+            git config --global --add safe.directory /opt/evanaireg-platform 2>/dev/null || true
+            set +x
+            git remote set-url origin "https://x-access-token:${{ secrets.GH_PAT }}@github.com/gnnave-sudo/evanaireg-platform.git" 2>/dev/null || true
+            git fetch origin main 2>/dev/null
+            git reset --hard origin/main 2>/dev/null
+            git remote set-url origin https://github.com/gnnave-sudo/evanaireg-platform.git 2>/dev/null || true
+            git clean -fd 2>/dev/null || true
+            echo "Code: $(git rev-parse --short HEAD)"
+
+            echo "=== Building and restarting ==="
+            docker compose down
+            docker compose up -d --build
+
+            echo "=== Health check ==="
+            sleep 5
+            curl -sf http://localhost:8100/health || { echo "Health check failed"; exit 1; }
+            echo "Deployed successfully"
