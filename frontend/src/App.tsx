@@ -1,7 +1,9 @@
 import { Component, type ReactNode, useEffect } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import EvanAI from './pages/EvanAI'
+import Login from './pages/Login'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 
 /* ===== Scroll to top on route change ===== */
 function ScrollToTop() {
@@ -16,10 +18,7 @@ function ScrollToTop() {
 function PageTransition({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   return (
-    <div
-      key={pathname}
-      className="animate-fade-in"
-    >
+    <div key={pathname} className="animate-fade-in">
       {children}
     </div>
   )
@@ -40,7 +39,6 @@ class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // eslint-disable-next-line no-console
     console.error('[ErrorBoundary]', error, info.componentStack)
   }
 
@@ -72,15 +70,34 @@ class ErrorBoundary extends Component<
   }
 }
 
+function AppRoutes() {
+  const { isAuthenticated } = useAuth()
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route
+        path="*"
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <ScrollToTop />
+              <PageTransition><EvanAI /></PageTransition>
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+    </Routes>
+  )
+}
+
 export default function App() {
   return (
-    <ErrorBoundary>
-      <Layout>
-        <ScrollToTop />
-        <Routes>
-          <Route path="*" element={<PageTransition><EvanAI /></PageTransition>} />
-        </Routes>
-      </Layout>
-    </ErrorBoundary>
+    <AuthProvider>
+      <ErrorBoundary>
+        <AppRoutes />
+      </ErrorBoundary>
+    </AuthProvider>
   )
 }

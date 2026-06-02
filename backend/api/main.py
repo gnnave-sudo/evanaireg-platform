@@ -422,6 +422,101 @@ def ingest_text(req: IngestRequest):
     }
 
 
+# ─── DASHBOARD ───
+@app.get("/v1/dashboard/summary")
+def dashboard_summary():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) as total FROM entities")
+    entities = c.fetchone()["total"]
+    c.execute("SELECT COUNT(*) as total FROM compliance_rules WHERE status='active'")
+    active_rules = c.fetchone()["total"]
+    c.execute("SELECT COUNT(*) as total FROM compliance_rules WHERE status='violated'")
+    violated_rules = c.fetchone()["total"]
+    c.execute("SELECT COUNT(*) as total FROM transactions")
+    transactions = c.fetchone()["total"]
+    c.execute("SELECT COUNT(*) as total FROM documents")
+    documents = c.fetchone()["total"]
+    c.execute("SELECT SUM(amount) as total FROM transactions WHERE timestamp > date('now', '-30 days')")
+    monthly_volume = c.fetchone()["total"] or 0
+    conn.close()
+    return {
+        "entities": entities,
+        "active_rules": active_rules,
+        "violated_rules": violated_rules,
+        "transactions": transactions,
+        "documents": documents,
+        "monthly_volume": monthly_volume,
+    }
+
+
+@app.get("/v1/dashboard/compliance-obligations")
+def dashboard_compliance_obligations():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, rule_name as name, rule_type as frequency, jurisdiction_code as owner, severity as status, rule_type as detail FROM compliance_rules WHERE status='active' ORDER BY severity DESC, created_at DESC LIMIT 20"
+    )
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    # Map severity to status labels
+    for row in rows:
+        sev = row.get("status", "MEDIUM")
+        row["status"] = "CRITICAL" if sev == "CRITICAL" else "Due Soon" if sev == "HIGH" else "Active" if sev == "MEDIUM" else "Scheduled"
+    return {"obligations": rows}
+
+
+@app.get("/v1/dashboard/escalations")
+def dashboard_escalations():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, rule_name as title, rule_type as description, jurisdiction_code as jurisdiction, severity as priority, status, created_at as dueDate FROM compliance_rules WHERE severity IN ('CRITICAL', 'HIGH') AND status='active' ORDER BY created_at DESC LIMIT 10"
+    )
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    for row in rows:
+        row["priority"] = "P0" if row.get("priority") == "CRITICAL" else "P1"
+    return {"escalations": rows}
+
+
+@app.get("/v1/dashboard/risk-flags")
+def dashboard_risk_flags():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, rule_name as risk, severity, status FROM compliance_rules WHERE severity IN ('CRITICAL', 'HIGH') ORDER BY created_at DESC LIMIT 10"
+    )
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    for row in rows:
+        row["status"] = "ESCALATED" if row.get("severity") == "CRITICAL" else "ACTIVE"
+    return {"risk_flags": rows}
+
+
+@app.get("/v1/dashboard/agents")
+def dashboard_agents():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) as total FROM compliance_rules WHERE status='active'")
+    rie_count = c.fetchone()["total"]
+    c.execute("SELECT COUNT(*) as total FROM transactions WHERE timestamp > date('now', '-1 days')")
+    tma_count = c.fetchone()["total"]
+    c.execute("SELECT COUNT(*) as total FROM documents WHERE parsed_at > date('now', '-7 days')")
+    re_count = c.fetchone()["total"]
+    c.execute("SELECT COUNT(*) as total FROM compliance_thresholds WHERE status='active'")
+    icca_count = c.fetchone()["total"]
+    conn.close()
+    return {
+        "agents": [
+            {"name": "RIE", "status": "active", "procedures": 3, "description": "Regulatory Intelligence Engine", "statLabel": "Active Rules", "statValue": str(rie_count)},
+            {"name": "TMA", "status": "active", "procedures": 3, "description": "Transaction Monitoring Agent", "statLabel": "Tx Today", "statValue": str(tma_count)},
+            {"name": "RE", "status": "active", "procedures": 4, "description": "Reporting Engine", "statLabel": "Docs/Week", "statValue": str(re_count)},
+            {"name": "ICCA", "status": "active", "procedures": 4, "description": "Contract & Compliance Agent", "statLabel": "Thresholds", "statValue": str(icca_count)},
+        ]
+    }
+
+
 # Serve frontend build
 DIST_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend/dist")
 app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")

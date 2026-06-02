@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Briefcase } from 'lucide-react'
+import { Briefcase, LogOut } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const { isAuthenticated, logout } = useAuth()
 
   useEffect(() => {
     function onScroll() {
@@ -110,15 +112,25 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* CTA Button */}
+          {/* CTA / Logout Button */}
           <div className="hidden md:block">
-            <a
-              href="#installation"
-              onClick={(e) => handleAnchorClick(e, '#installation')}
-              className="font-body font-semibold text-sm bg-warm-amber text-obsidian px-6 py-3 rounded-lg transition-all duration-200 hover:scale-[1.03] hover:shadow-amber-glow inline-block"
-            >
-              Get Started
-            </a>
+            {isAuthenticated ? (
+              <button
+                onClick={logout}
+                className="font-body font-semibold text-sm border border-subtle-line text-muted-sand px-6 py-3 rounded-lg transition-all duration-200 hover:border-warm-amber hover:text-warm-amber inline-flex items-center gap-2"
+              >
+                <LogOut size={14} />
+                Logout
+              </button>
+            ) : (
+              <a
+                href="#installation"
+                onClick={(e) => handleAnchorClick(e, '#installation')}
+                className="font-body font-semibold text-sm bg-warm-amber text-obsidian px-6 py-3 rounded-lg transition-all duration-200 hover:scale-[1.03] hover:shadow-amber-glow inline-block"
+              >
+                Get Started
+              </a>
+            )}
           </div>
 
           {/* Mobile Hamburger */}
@@ -171,13 +183,23 @@ export default function Navbar() {
               </a>
             )
           )}
-          <a
-            href="#installation"
-            onClick={(e) => handleAnchorClick(e, '#installation')}
-            className="mt-4 font-body font-semibold text-base bg-warm-amber text-obsidian px-8 py-4 rounded-lg"
-          >
-            Get Started
-          </a>
+          {isAuthenticated ? (
+            <button
+              onClick={logout}
+              className="mt-4 font-body font-semibold text-base border border-subtle-line text-muted-sand px-8 py-4 rounded-lg inline-flex items-center gap-2"
+            >
+              <LogOut size={18} />
+              Logout
+            </button>
+          ) : (
+            <a
+              href="#installation"
+              onClick={(e) => handleAnchorClick(e, '#installation')}
+              className="mt-4 font-body font-semibold text-base bg-warm-amber text-obsidian px-8 py-4 rounded-lg"
+            >
+              Get Started
+            </a>
+          )}
         </div>
       )}
     </>

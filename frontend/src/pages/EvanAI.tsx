@@ -390,6 +390,22 @@ function VosAgentPanel() {
   const sectionRef = useRef<HTMLElement>(null)
   const headingRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
+  const [agentStats, setAgentStats] = useState<Record<string, { statLabel: string; statValue: string }>>({})
+
+  useEffect(() => {
+    fetch('/v1/dashboard/agents', { headers: { Authorization: 'Bearer evan-x870-local-key' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.agents) {
+          const stats: Record<string, { statLabel: string; statValue: string }> = {}
+          data.agents.forEach((a: any) => {
+            stats[a.name] = { statLabel: a.statLabel, statValue: a.statValue }
+          })
+          setAgentStats(stats)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -417,6 +433,12 @@ function VosAgentPanel() {
     return () => ctx.revert()
   }, [])
 
+  const mergedAgents = vosAgents.map(agent => ({
+    ...agent,
+    statLabel: agentStats[agent.id]?.statLabel || agent.statLabel,
+    statValue: agentStats[agent.id]?.statValue || agent.statValue,
+  }))
+
   return (
     <section ref={sectionRef} className="relative py-[120px] md:py-[160px] px-5 md:px-12" style={{ background: '#0F0F14' }}>
       <div className="max-w-[1280px] mx-auto">
@@ -431,7 +453,7 @@ function VosAgentPanel() {
         </div>
 
         <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {vosAgents.map((agent) => (
+          {mergedAgents.map((agent) => (
             <div
               key={agent.id}
               className="vos-card group relative bg-surface-dark border border-subtle-line rounded-xl p-6 transition-all duration-300 hover:border-warm-amber/40 hover:bg-[rgba(232,168,56,0.04)] hover:-translate-y-1"
@@ -859,6 +881,17 @@ function CredibilityWidget() {
 }
 
 function EscalationsWidget() {
+  const [items, setItems] = useState(escalationItems)
+
+  useEffect(() => {
+    fetch('/v1/dashboard/escalations', { headers: { Authorization: 'Bearer evan-x870-local-key' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.escalations?.length) setItems(data.escalations)
+      })
+      .catch(() => {})
+  }, [])
+
   return (
     <div className="bg-surface-dark border border-subtle-line rounded-xl p-5 h-full">
       <div className="flex items-center gap-2 mb-4">
@@ -866,7 +899,7 @@ function EscalationsWidget() {
         <h3 className="font-body font-semibold text-[15px] text-soft-cream">Active Escalations</h3>
       </div>
       <div className="space-y-3">
-        {escalationItems.map((item) => (
+        {items.map((item: any) => (
           <div key={item.id} className="p-3 bg-obsidian/50 rounded-lg border border-subtle-line/50">
             <div className="flex items-center gap-2 mb-1.5">
               <span className={`font-mono text-[10px] font-medium px-1.5 py-0.5 rounded border ${priorityColor(item.priority)}`}>

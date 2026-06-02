@@ -1,12 +1,15 @@
 const API_BASE = ''
-const API_KEY = 'evan-x870-local-key'
+
+function getApiKey(): string {
+  return localStorage.getItem('evan_api_key') || 'evan-x870-local-key'
+}
 
 async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
   const opts: RequestInit = {
     method,
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${API_KEY}`,
+      'Authorization': `Bearer ${getApiKey()}`,
     },
   }
   if (body) opts.body = JSON.stringify(body)
