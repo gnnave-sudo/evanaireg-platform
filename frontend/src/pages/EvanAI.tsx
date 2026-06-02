@@ -779,8 +779,29 @@ function NLCommandCenter() {
 /* ─────────────────── Section 6: Live Dashboard ─────────────────── */
 
 function StressLabWidget() {
-  const radarData = buildRadarData(stressResults)
-  const current = stressResults[0]
+  const [data, setData] = useState(stressResults)
+
+  useEffect(() => {
+    fetch('/v1/dashboard/stress-results', { headers: { Authorization: 'Bearer evan-x870-local-key' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(res => {
+        if (res?.results?.length) {
+          setData(res.results.map((r: any) => ({
+            id: r.id,
+            scenario: r.scenario,
+            overallRisk: r.overallRisk,
+            dimensions: r.dimensions,
+            recommendation: r.recommendation,
+            businessAdvocate: r.businessAdvocate,
+            timestamp: r.timestamp,
+          })))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const radarData = buildRadarData(data)
+  const current = data[0]
 
   return (
     <div className="bg-surface-dark border border-subtle-line rounded-xl p-5 h-full flex flex-col">
@@ -811,14 +832,6 @@ function StressLabWidget() {
               fillOpacity={0.2}
               strokeWidth={2}
             />
-            <Radar
-              name="Scenario 2"
-              dataKey="Scenario 2"
-              stroke="#38bdf8"
-              fill="#38bdf8"
-              fillOpacity={0.1}
-              strokeWidth={1.5}
-            />
             <Tooltip
               contentStyle={{
                 background: '#1C1C26',
@@ -847,7 +860,18 @@ function StressLabWidget() {
 }
 
 function CredibilityWidget() {
-  const top3 = [...credibilityEntries].sort((a, b) => b.weightedScore - a.weightedScore).slice(0, 3)
+  const [entries, setEntries] = useState(credibilityEntries)
+
+  useEffect(() => {
+    fetch('/v1/dashboard/credibility', { headers: { Authorization: 'Bearer evan-x870-local-key' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.entries?.length) setEntries(data.entries)
+      })
+      .catch(() => {})
+  }, [])
+
+  const top3 = [...entries].sort((a: any, b: any) => b.weightedScore - a.weightedScore).slice(0, 3)
 
   return (
     <div className="bg-surface-dark border border-subtle-line rounded-xl p-5 h-full">
@@ -856,7 +880,7 @@ function CredibilityWidget() {
         <h3 className="font-body font-semibold text-[15px] text-soft-cream">Credibility Leaderboard</h3>
       </div>
       <div className="space-y-3">
-        {top3.map((entry, idx) => (
+        {top3.map((entry: any, idx: number) => (
           <div key={entry.id} className="flex items-center gap-3 p-3 bg-obsidian/50 rounded-lg border border-subtle-line/50">
             <div className="flex-shrink-0 w-7 h-7 rounded-full bg-warm-amber/10 border border-warm-amber/20 flex items-center justify-center">
               <span className="font-mono text-[11px] font-bold text-warm-amber">{idx + 1}</span>
@@ -922,7 +946,18 @@ function EscalationsWidget() {
 }
 
 function PatternsWidget() {
-  const latest = patternExtracts[0]
+  const [patterns, setPatterns] = useState(patternExtracts)
+
+  useEffect(() => {
+    fetch('/v1/dashboard/patterns', { headers: { Authorization: 'Bearer evan-x870-local-key' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.patterns?.length) setPatterns(data.patterns)
+      })
+      .catch(() => {})
+  }, [])
+
+  const latest = patterns[0] || patternExtracts[0]
 
   return (
     <div className="bg-surface-dark border border-subtle-line rounded-xl p-5 h-full">
@@ -937,7 +972,7 @@ function PatternsWidget() {
           <div className="space-y-1.5">
             <div>
               <div className="font-mono text-[9px] text-muted-sand uppercase mb-1">Risk Drivers</div>
-              {latest?.riskDrivers.slice(0, 2).map((r, i) => (
+              {(latest?.riskDrivers || []).slice(0, 2).map((r: string, i: number) => (
                 <div key={i} className="flex items-center gap-1.5">
                   <ChevronRight size={10} className="text-red-400 flex-shrink-0" />
                   <span className="font-body text-[12px] text-muted-sand">{r}</span>
@@ -946,7 +981,7 @@ function PatternsWidget() {
             </div>
             <div>
               <div className="font-mono text-[9px] text-muted-sand uppercase mb-1">Control Weaknesses</div>
-              {latest?.controlWeaknesses.slice(0, 2).map((c, i) => (
+              {(latest?.controlWeaknesses || []).slice(0, 2).map((c: string, i: number) => (
                 <div key={i} className="flex items-center gap-1.5">
                   <ChevronRight size={10} className="text-orange-400 flex-shrink-0" />
                   <span className="font-body text-[12px] text-muted-sand">{c}</span>
@@ -961,7 +996,18 @@ function PatternsWidget() {
 }
 
 function DriftWidget() {
-  const latest = driftEvents[0]
+  const [events, setEvents] = useState(driftEvents)
+
+  useEffect(() => {
+    fetch('/v1/dashboard/drift', { headers: { Authorization: 'Bearer evan-x870-local-key' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.drift_events?.length) setEvents(data.drift_events)
+      })
+      .catch(() => {})
+  }, [])
+
+  const latest = events[0] || driftEvents[0]
 
   return (
     <div className="bg-surface-dark border border-subtle-line rounded-xl p-5 h-full">

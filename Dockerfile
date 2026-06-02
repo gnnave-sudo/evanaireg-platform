@@ -23,9 +23,6 @@ COPY frontend/dist/ ./frontend/dist/
 COPY evanaireg.db ./evanaireg.db
 COPY .env ./.env
 
-RUN chown -R evan:evan /app
-USER evan
-
 EXPOSE 8100
 
 CMD ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8100"]
