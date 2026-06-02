@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import type { NLQueryResponse } from '@/lib/api'
+import { nlQuery } from '@/lib/api'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -641,16 +642,7 @@ function NLCommandCenter() {
     setError('')
     setResponse(null)
     try {
-      const res = await fetch('/v1/nl/query', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer evan-x870-local-key',
-        },
-        body: JSON.stringify({ query: text, entity_slug: 'vortex-pay' }),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const data = await nlQuery('vortex-pay', text)
       setResponse(data)
     } catch (e: any) {
       setError(e.message || 'Request failed')

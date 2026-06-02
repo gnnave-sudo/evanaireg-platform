@@ -64,3 +64,7 @@ export interface Transaction {
   counterparty: string
   description: string
 }
+
+export async function nlQuery(entitySlug: string, query: string): Promise<NLQueryResponse> {
+  return apiClient.post<NLQueryResponse>('/v1/nl/query', { entity_slug: entitySlug, query })
+}
